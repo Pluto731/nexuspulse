@@ -20,8 +20,12 @@ wheels/
 .installed.cfg
 *.egg
 
-.env
-.env.local
+# Environment variables and secrets (Strict protection)
+.env*
+!.env.example
+*.key
+*.pem
+*.secret
 .venv
 *.log
 .pytest_cache/

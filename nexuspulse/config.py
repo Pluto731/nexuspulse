@@ -37,6 +37,20 @@ class Settings(BaseSettings):
         description="Fallback to in-memory/SQLite store if Postgres is unavailable",
     )
 
+    # Ingestion & Live RSS Configuration
+    rss_feeds: dict = Field(
+        default={
+            "ArXiv CS.AI": "https://rss.arxiv.org/rss/cs.AI",
+            "Hacker News": "https://news.ycombinator.com/rss",
+            "Hugging Face Blog": "https://huggingface.co/blog/feed.xml",
+        },
+        description="Dictionary of source_name -> RSS feed URL",
+    )
+    max_articles_per_sync: int = Field(
+        default=3, description="Safety limit for articles to process through Agent pipeline per sync run"
+    )
+    fetch_timeout: float = Field(default=15.0, description="HTTP fetch timeout in seconds")
+
     # Agent Pipeline Parameters
     triage_threshold: float = Field(
         default=7.0, description="Minimum score (out of 10) to trigger deep investigation"

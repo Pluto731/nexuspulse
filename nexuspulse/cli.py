@@ -16,15 +16,20 @@ from nexuspulse.exporters.obsidian import ObsidianExporter
 from nexuspulse.distribution.podcast import CyberPodcastGenerator
 from nexuspulse.config import settings
 
+import argparse
+
 console = Console()
 
 
-async def run_prototype_demo():
-    """Run full end-to-end prototype demo."""
+async def run_pipeline(live: bool = False, limit: Optional[int] = None):
+    """Run full end-to-end intelligence pipeline."""
+    limit = limit or settings.max_articles_per_sync
+    mode_text = "[bold green]真实全网技术 RSS 实时流[/bold green]" if live else "[dim]内置演示样本流[/dim]"
     console.print(
         Panel.fit(
             "[bold cyan]🪐 NexusPulse: 自主科技情报中枢与混合检索平台[/bold cyan]\n"
-            "[dim]LangGraph 多智能体 Critic Loop ✕ pgvector 时效混合检索 ✕ FastMCP ✕ 赛博双人播客[/dim]",
+            f"[dim]模式: {mode_text} | 单次处理上限: {limit} 篇 | 模型: {settings.llm_model}[/dim]\n"
+            "[dim]LangGraph 多智能体 Critic Loop ✕ pgvector 时效混合检索 ✕ FastMCP ✕ 纯文本对谈文稿[/dim]",
             border_style="cyan",
         )
     )
@@ -32,14 +37,28 @@ async def run_prototype_demo():
     # ----------------------------------------------------
     # Stage 1: Data Ingestion & Deduplication
     # ----------------------------------------------------
-    console.print("\n[bold yellow]📡 阶段 1: 实时数据流增量摄取与指纹去重[/bold yellow]")
-    articles = RSSFetcher.get_sample_stream()
+    fetcher = RSSFetcher(timeout=settings.fetch_timeout)
     deduplicator = ContentDeduplicator()
 
-    table = Table(title="摄取技术线索池", show_header=True, header_style="bold magenta")
+    if live:
+        console.print(f"\n[bold yellow]📡 阶段 1: 正在异步连接全网真实 RSS 数据源...[/bold yellow]")
+        for name, url in settings.rss_feeds.items():
+            console.print(f"  - 订阅源: [cyan]{name}[/cyan] ({url})")
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            transient=True,
+        ) as progress:
+            task = progress.add_task(description="[cyan]抓取中...[/cyan]", total=None)
+            articles = await fetcher.fetch_all_live_feeds(limit_per_feed=3)
+    else:
+        console.print("\n[bold yellow]📡 阶段 1: 加载技术基准流与指纹去重[/bold yellow]")
+        articles = RSSFetcher.get_sample_stream()
+
+    table = Table(title=f"摄取技术线索池 (获取到 {len(articles)} 条)", show_header=True, header_style="bold magenta")
     table.add_column("ID", style="dim", width=10)
-    table.add_column("来源", width=16)
-    table.add_column("标题", width=45)
+    table.add_column("来源", width=18)
+    table.add_column("标题", width=42)
     table.add_column("指纹状态", width=15)
 
     valid_articles = []
@@ -48,9 +67,12 @@ async def run_prototype_demo():
             status = "[red]重复 (Filtered)[/red]"
         else:
             deduplicator.register(art.id, art.title, art.content)
-            valid_articles.append(art)
             status = "[green]新线索 (Unique)[/green]"
-        table.add_row(art.id, art.source_name, art.title[:42] + "...", status)
+            if len(valid_articles) < limit:
+                valid_articles.append(art)
+            else:
+                status += " [dim](排队中)[/dim]"
+        table.add_row(art.id[:8] + "...", art.source_name, art.title[:40] + "...", status)
 
     console.print(table)
 
@@ -171,7 +193,14 @@ async def run_prototype_demo():
 
 
 def main():
-    asyncio.run(run_prototype_demo())
+    parser = argparse.ArgumentParser(description="NexusPulse Autonomous Tech Intelligence CLI")
+    parser.add_argument("--live", action="store_true", help="Connect to real remote RSS feeds instead of sample stream")
+    parser.add_argument("--sample", action="store_true", help="Use local sample stream (default)")
+    parser.add_argument("--limit", type=int, default=settings.max_articles_per_sync, help="Max articles to process in this run")
+    args = parser.parse_args()
+
+    is_live = args.live and not args.sample
+    asyncio.run(run_pipeline(live=is_live, limit=args.limit))
 
 
 if __name__ == "__main__":
