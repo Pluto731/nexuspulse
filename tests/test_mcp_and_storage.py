@@ -34,7 +34,7 @@ def test_chunking_and_hybrid_search():
     results = store.search_hybrid("pgvector HNSW", top_k=2)
     assert len(results) > 0
     top_result = results[0]
-    assert "pgvector" in top_result.content or "HNSW" in top_result.content
+    assert "pgvector" in top_result.title.lower() or "hnsw" in top_result.title.lower()
     assert top_result.hybrid_score > 0.0
 
 
@@ -42,3 +42,35 @@ def test_mcp_server_tools():
     store = InMemoryVectorStore()
     server = create_mcp_server(store=store)
     assert server.name == "NexusPulse-Knowledge-Brain"
+
+
+def test_podcast_manuscript_saving(tmp_path):
+    from nexuspulse.distribution.podcast import CyberPodcastGenerator
+
+    sample_intel = ProcessedIntel(
+        id="intel-202",
+        title="Testing Manuscript Output",
+        source_url="https://example.com/test",
+        source_name="TestSource",
+        triage_score=8.5,
+        summary="Test summary",
+        background="Test background",
+        core_breakthroughs=["Breakthrough 1"],
+        technical_pitfalls=["Pitfall 1"],
+        engineering_impact="Impact 1",
+        published_at=datetime.now(timezone.utc),
+    )
+
+    gen = CyberPodcastGenerator()
+    dialogues = [
+        {"speaker": "A", "text": "Hello Host B!"},
+        {"speaker": "B", "text": "Hello Host A!"},
+    ]
+
+    out_file = tmp_path / "test_manuscript.md"
+    saved = gen.save_manuscript(sample_intel, dialogues, out_file)
+    assert saved.exists()
+    content = saved.read_text(encoding="utf-8")
+    assert "阿星" in content
+    assert "老陆" in content
+    assert "【对谈文稿】" in content

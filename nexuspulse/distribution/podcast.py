@@ -65,8 +65,64 @@ class CyberPodcastGenerator:
         result = await self.llm_client.generate_json(PODCAST_DIALOGUE_PROMPT, user_prompt, mock_data)
         return result.get("dialogues", mock_data["dialogues"])
 
-    async def render_audio(self, dialogues: List[Dict[str, str]], output_path: Path) -> Path:
-        """Synthesize dialogues into multi-track MP3 audio."""
+    def format_manuscript_markdown(self, intel: ProcessedIntel, dialogues: List[Dict[str, str]]) -> str:
+        """Format the dialogue script into a clean, readable Markdown manuscript."""
+        lines = [
+            "---",
+            f'title: "【对谈文稿】{intel.title}"',
+            f'source_intel: "{intel.id}"',
+            'type: "podcast_manuscript"',
+            f'created_at: "{intel.created_at.isoformat()}"',
+            f'tags:\n  - TechPodcast\n  - DialogueScript',
+            "---",
+            "",
+            f"# 🎙️ 科技对谈实录：{intel.title}",
+            "",
+            "> **栏目定位**: 《NexusPulse 赛博茶馆》—— 尖锐发问 vs 毒舌解构  ",
+            f"> **关联研报**: [[{intel.title}]] | **原文来源**: [{intel.source_name}]({intel.source_url})  ",
+            "> **登场人物**:  ",
+            "> - 🧑‍💻 **Host A (阿星)**: 敏锐犀利的科技探究者，直击痛点，追问本质。  ",
+            "> - 🧙‍♂️ **Host B (老陆)**: 毒舌硬核的老牌架构师，反感概念炒作，专注底层代价与实战权衡。  ",
+            "",
+            "---",
+            "",
+            "## 💬 对谈正文记录 (Transcript)",
+            "",
+        ]
+
+        for i, line in enumerate(dialogues, 1):
+            speaker = line.get("speaker", "A")
+            text = line.get("text", "")
+            if speaker == "A":
+                lines.append(f"**阿星** (Host A) `[{i:02d}]`:")
+                lines.append(f"> {text}\n")
+            else:
+                lines.append(f"**老陆** (Host B) `[{i:02d}]`:")
+                lines.append(f"> {text}\n")
+
+        lines.extend([
+            "---",
+            "",
+            "## 📌 老陆的架构备忘录 (Takeaways)",
+            f"- **核心警示**: {intel.technical_pitfalls[0] if intel.technical_pitfalls else '谨慎评估状态持久化成本'}",
+            f"- **落地法则**: {intel.engineering_impact}",
+            "",
+            "*本实例文稿由 [[NexusPulse]] 自动生成，纯文本存储，零空间冗余。*",
+        ])
+        return "\n".join(lines)
+
+    def save_manuscript(self, intel: ProcessedIntel, dialogues: List[Dict[str, str]], output_path: Path) -> Path:
+        """Save formatted conversational manuscript to file."""
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        md_content = self.format_manuscript_markdown(intel, dialogues)
+        output_path.write_text(md_content, encoding="utf-8")
+        return output_path
+
+    async def render_audio(self, dialogues: List[Dict[str, str]], output_path: Path) -> Optional[Path]:
+        """Synthesize dialogues into multi-track MP3 audio (only if generate_audio is True)."""
+        if not settings.generate_audio:
+            return None
+
         output_path.parent.mkdir(parents=True, exist_ok=True)
         audio_segments: List[bytes] = []
 
@@ -83,10 +139,8 @@ class CyberPodcastGenerator:
 
             if buffer:
                 audio_segments.append(bytes(buffer))
-                # Add small silence buffer between utterances (approx 300ms of empty MPEG padding or silence frames)
                 await asyncio.sleep(0.05)
 
-        # Merge segments into single MP3
         with open(output_path, "wb") as f:
             for seg in audio_segments:
                 f.write(seg)

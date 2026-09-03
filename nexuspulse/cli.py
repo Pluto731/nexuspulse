@@ -127,11 +127,11 @@ async def run_prototype_demo():
     console.print(search_table)
 
     # ----------------------------------------------------
-    # Stage 6: Cyber Podcast Dual-Voice Generation
+    # Stage 6: Cyber Podcast Dialogue Manuscript Generation
     # ----------------------------------------------------
     if processed_reports:
         sample_intel = processed_reports[0]
-        console.print(f"\n[bold yellow]🎙️ 阶段 4: 赛博双人对抗播客分发 (Edge-TTS 异步分轨合成)[/bold yellow]")
+        console.print(f"\n[bold yellow]🎙️ 阶段 4: 赛博双人对抗播客文稿生成 (零体积纯文本沉淀)[/bold yellow]")
         console.print(f"正在基于研报 [bold]{sample_intel.title}[/bold] 生成认知冲突对谈剧本...")
 
         dialogues = await podcast_gen.generate_script(sample_intel)
@@ -139,10 +139,19 @@ async def run_prototype_demo():
             speaker_tag = "[bold green]Host A (阿星)[/bold green]" if line["speaker"] == "A" else "[bold magenta]Host B (老陆)[/bold magenta]"
             console.print(f"  {speaker_tag}: {line['text']}")
 
-        output_audio = Path("/tmp/nexus_podcast_sample.mp3")
-        console.print(f"\n正在调用 Edge-TTS 合成并混音音频流...")
-        await podcast_gen.render_audio(dialogues[:4], output_audio)
-        console.print(f"[bold green]✔ 播客音频片段已生成[/bold green]: [underline]{output_audio}[/underline] ({output_audio.stat().st_size / 1024:.1f} KB)")
+        # Save Markdown transcript directly to Obsidian / Project
+        manuscript_dir = settings.obsidian_vault_path / "Podcasts"
+        manuscript_path = manuscript_dir / f"【对谈文稿】{sample_intel.id}.md"
+        saved_doc = podcast_gen.save_manuscript(sample_intel, dialogues, manuscript_path)
+        console.print(f"[bold green]✔ 对谈文稿已保存[/bold green]: [cyan]{saved_doc}[/cyan] (纯文本 Markdown 格式，不占存储)")
+
+        if settings.generate_audio:
+            output_audio = Path("/tmp/nexus_podcast_sample.mp3")
+            console.print(f"正在调用 Edge-TTS 合成音频流...")
+            await podcast_gen.render_audio(dialogues[:4], output_audio)
+            console.print(f"[green]✔ 音频已生成: {output_audio}[/green]")
+        else:
+            console.print(f"  [dim]ℹ️ 提示: MP3 音频生成已关闭 (纯文本节约空间模式生效中)[/dim]")
 
     # ----------------------------------------------------
     # Summary
@@ -153,8 +162,8 @@ async def run_prototype_demo():
             f"1. [bold]数据摄取[/bold]: 成功识别并清洗技术资讯，成功拦截营销软文。\n"
             f"2. [bold]LangGraph 回环[/bold]: 经过 Triage -> Scout -> Synthesis -> Critic 完成对抗重写闭环。\n"
             f"3. [bold]混合检索[/bold]: 验证 Dense+Sparse 稠密稀疏双路召回与牛顿冷却时间衰减。\n"
-            f"4. [bold]知识沉淀[/bold]: Markdown 研报与双链已写入: [cyan]{settings.obsidian_vault_path}[/cyan]\n"
-            f"5. [bold]多模态分发[/bold]: 双角色对谈音频已合成；可使用 FastMCP 服务向 Cursor/Claude Code 暴露知识端点。\n\n"
+            f"4. [bold]知识沉淀[/bold]: Markdown 研报与双人对谈文稿已写入: [cyan]{settings.obsidian_vault_path}[/cyan]\n"
+            f"5. [bold]接口生态[/bold]: 对谈文稿与研报纯文本沉淀；可使用 FastMCP 服务向 Cursor/Claude Code 暴露知识端点。\n\n"
             f"启动 MCP Server: [cyan]python -m nexuspulse.distribution.mcp_server[/cyan]",
             border_style="green",
         )

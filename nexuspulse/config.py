@@ -52,7 +52,10 @@ class Settings(BaseSettings):
         default=0.005, description="Exponential decay factor per hour (Newton cooling decay)"
     )
 
-    # Podcast Generation
+    # Podcast & Manuscript Generation
+    generate_audio: bool = Field(
+        default=False, description="Whether to synthesize MP3 audio via Edge-TTS (False by default to save space)"
+    )
     podcast_voice_host_a: str = Field(
         default="zh-CN-YunxiNeural", description="Edge-TTS voice for Host A (Inquisitive Lead)"
     )
