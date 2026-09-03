@@ -27,8 +27,8 @@ if [ -n "$FOUND_LEAKS" ]; then
     exit 1
 fi
 
-# 3. Scan git commit history for keys
-HISTORY_LEAKS=$(git log -p -n 50 | grep -E -I "$SUSPECT_PATTERNS" || true)
+# 3. Scan git commit history for keys (excluding the audit script itself)
+HISTORY_LEAKS=$(git log -p -n 50 -- . ':!scripts/verify_no_secrets.sh' | grep -E -I "$SUSPECT_PATTERNS" || true)
 if [ -n "$HISTORY_LEAKS" ]; then
     echo "❌ [ALERT] Found potential secret leak in commit history:"
     echo "$HISTORY_LEAKS"
